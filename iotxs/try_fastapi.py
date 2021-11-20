@@ -19,7 +19,7 @@ def read_root():
     return {"Hello": "World"}
 
 
-SERVER_HOST = "iotxs"
+SERVER_HOST = "10.144.69.132"
 DB_CONNECTION_STRING = "mongodb://aprilab:bossboss@{server}".format(server=SERVER_HOST)
 
 mqtt_client = mqtt.Client()
