@@ -24,8 +24,11 @@ def publish_content():
 
 @app.on_event("startup")
 async def startup_event():
+    connectivity.logger = logging.getLogger("uvicorn.connectivity")
+    connectivity.logger.setLevel(logging.DEBUG)
     connectivity.init()
     lock.logger = logging.getLogger("uvicorn.lock")
+    lock.logger.setLevel(logging.DEBUG)
     lock.init()
 
 

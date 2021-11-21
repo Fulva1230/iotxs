@@ -7,6 +7,7 @@ from pydantic import BaseModel, ValidationError
 from .msg_types import LockCommand
 from logging import Logger
 from typing import Optional
+from datetime import datetime
 
 # Subscribe to the topic "iotxs/+/lock" where + is the name of the client
 # Publish to the topic "iotxs/+/lock_notification
@@ -16,7 +17,7 @@ SUBSCRIPTION_NAME_PATTERN = "iotxs/+/lock"
 CLIENT_NAME_PATTERN = re.compile(".*?/(.*?)/")
 life_state = False
 DATABASE_NAME = "iotxs"
-LOCK_REQ_RECORD_COLLECTION_NAME = "lock_req_record"
+LOCK_REQ_RECORD_COLLECTION_NAME = "lock_req_records"
 
 logger: Optional[Logger] = None
 
@@ -24,6 +25,7 @@ logger: Optional[Logger] = None
 class LockReqRecord(BaseModel):
     client: str
     command: LockCommand
+    datetime: datetime
 
 
 lock_req_record_list: list[LockReqRecord] = []
@@ -46,7 +48,7 @@ def _lock_msg_callback(client, userdata, msg):
     try:
         lock_req_record_list.append(
             LockReqRecord(client=re.search(CLIENT_NAME_PATTERN, msg.topic).group(1),
-                          command=LockCommand.parse_raw(msg.payload))
+                          command=LockCommand.parse_raw(msg.payload), datetime=datetime.now())
         )
         logger.debug("got msg")
     except ValidationError as e:

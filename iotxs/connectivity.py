@@ -7,9 +7,12 @@ from threading import Thread
 import asyncio
 import paho.mqtt.client as mqtt
 from motor.motor_asyncio import AsyncIOMotorClient
+from logging import Logger
 
 SERVER_HOST = "10.144.69.132"
 DB_CONNECTION_STRING = "mongodb://aprilab:bossboss@{server}".format(server=SERVER_HOST)
+
+logger: Optional[Logger] = None
 
 
 def own_thread_func():
@@ -54,6 +57,7 @@ def clean_up():
     if mongo_client is not None:
         mongo_client.close()
     mqtt_client.disconnect()
+    logger.info("Successfully connectivity resources released") if logger is not None else ...
 
 
 def init():
