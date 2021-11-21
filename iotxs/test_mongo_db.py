@@ -3,18 +3,19 @@ import json
 import logging
 import functools
 
-from . import try_fastapi
+from . import main
 import paho.mqtt.client as mqtt
 from datetime import datetime
 from .datatypes import DatetimeContent
+from . import connectivity
 
 
 def test_mongo_insert():
-    async def main():
-        try_fastapi.mongo_client = try_fastapi.AsyncIOMotorClient(try_fastapi.DB_CONNECTION_STRING)
-        await try_fastapi.push_hello_world()
+    async def mainf():
+        main.mongo_client = main.AsyncIOMotorClient(main.DB_CONNECTION_STRING)
+        await main.push_hello_world()
 
-    asyncio.run(main())
+    asyncio.run(mainf())
 
 
 def test_mqtt_save():

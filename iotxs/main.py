@@ -34,7 +34,6 @@ async def push_hello_world():
         await collection.insert_one({"value": "hello world", "datetime": datetime.now()}, session=s)
 
 
-
 async def periodic_publish():
     json_encoder = JSONEncoder()
     while True:
@@ -52,6 +51,7 @@ def save_to_database(client, userdata, message):
         msg_obj = DatetimeContent.parse_raw(message.payload)
         async with await mongo_client.start_session() as s:
             await collection.insert_one(msg_obj.dict(), session=s)
+
     asyncio.create_task(impl())
 
 
