@@ -39,8 +39,7 @@ async def _lock_req_record_db_push():
                     (req_record.dict() for req_record in lock_req_record_list))
                 lock_req_record_list.clear()
             except BaseException as e:
-                if logger is not None:
-                    logger.exception(e)
+                logger.exception(e) if logger is not None else ...
         await asyncio.sleep(0)
 
 
@@ -50,9 +49,9 @@ def _lock_msg_callback(client, userdata, msg):
             LockReqRecord(client=re.search(CLIENT_NAME_PATTERN, msg.topic).group(1),
                           command=LockCommand.parse_raw(msg.payload), datetime=datetime.now())
         )
-        logger.debug("got msg")
+        logger.debug("got msg") if logger is not None else ...
     except ValidationError as e:
-        print(e)
+        logger.exception(e) if logger is not None else ...
 
 
 async def _mqtt_client_subscribe():
