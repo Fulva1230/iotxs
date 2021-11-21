@@ -36,7 +36,7 @@ mongo_client: Optional[AsyncIOMotorClient]
 
 thread: Optional[Thread] = Thread(target=own_thread_func)
 unfinished_task: list[asyncio.Task] = []
-life_state: Literal['ENABLED', 'DISABLED', "STOP_REQ"] = "DISABLED"
+life_state: Literal["ENABLED", "DISABLED", "STOP_REQ"] = "DISABLED"
 coroutine_reqs: list[Coroutine] = []
 
 
@@ -60,4 +60,7 @@ def deinit():
             await asyncio.sleep(0)
         life_state = "DISABLED"
 
-    asyncio.create_task(impl())
+    async def task_creator():
+        asyncio.create_task(impl())
+
+    coroutine_reqs.append(task_creator())

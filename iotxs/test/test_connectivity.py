@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from datetime import datetime
 
 from .. import connectivity
@@ -39,7 +40,8 @@ def test_mqtt_publish():
 def test_mongo_manipulate():
     connectivity.init()
     document_list_to_insert: list[DatetimeContent] = [
-        DatetimeContent(content="hey{}".format(i), datetime=datetime.fromisoformat(datetime.now().isoformat()[:-3])) for i in
+        DatetimeContent(content="hey{}".format(i), datetime=datetime.fromisoformat(datetime.now().isoformat()[:-3])) for
+        i in
         range(10)]
     document_list_queried: list[DatetimeContent] = []
 
@@ -59,3 +61,17 @@ def test_mongo_manipulate():
     connectivity.coroutine_reqs.append(mongo_manipulate())
     connectivity.thread.join()
     assert document_list_to_insert == document_list_queried
+
+
+def test_suitable_deinit():
+    connectivity.init()
+
+    async def mqtt_publish():
+        while connectivity.life_state in ["ENABLED"]:
+            connectivity.mqtt_client.publish("test", OnlyStr(msg='hello world!').json())
+            await asyncio.sleep(0.1)
+
+    connectivity.coroutine_reqs.append(mqtt_publish())
+    time.sleep(3.0)
+    connectivity.deinit()
+    connectivity.thread.join()
