@@ -6,7 +6,7 @@ import functools
 from . import main
 import paho.mqtt.client as mqtt
 from datetime import datetime
-from .datatypes import DatetimeContent
+from .msg_types import DatetimeContent
 from . import connectivity
 
 

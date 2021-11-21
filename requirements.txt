@@ -4,3 +4,4 @@ uvicorn[standard]
 paho-mqtt
 PyYAML
 motor
+rx

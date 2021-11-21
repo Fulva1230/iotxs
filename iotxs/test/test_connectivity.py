@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 
 from .. import connectivity
-from ..datatypes import DatetimeContent
+from ..msg_types import DatetimeContent
 from pydantic import BaseModel
 
 
