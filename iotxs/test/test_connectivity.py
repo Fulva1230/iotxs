@@ -63,6 +63,32 @@ def test_mongo_manipulate():
     assert document_list_to_insert == document_list_queried
 
 
+# Without external state change, the test won't end.
+def test_change_stream():
+    connectivity.init()
+
+    async def insert_records():
+        while connectivity.life_state in ["ENABLED"]:
+            await connectivity.mongo_client["iotxs"]["test_change_stream"].insert_one({})
+            await asyncio.sleep(0.1)
+
+    async def iterate_change_stream():
+        try:
+            async with connectivity.mongo_client["iotxs"]["test_change_stream"].watch() as change_stream:
+                i = 0
+                async for change in change_stream:
+                    i += 1
+                    if i == 5:
+                        await change_stream.close()
+        except BaseException as e:
+            print(e)
+        connectivity.deinit()
+
+    connectivity.coroutine_reqs.append(iterate_change_stream())
+    connectivity.coroutine_reqs.append(insert_records())
+    connectivity.thread.join()
+
+
 def test_suitable_deinit():
     connectivity.init()
 

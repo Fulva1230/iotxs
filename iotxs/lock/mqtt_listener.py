@@ -1,10 +1,12 @@
 import asyncio
 import re
 
-from . import connectivity
+from iotxs import connectivity
 from rx.core.typing import Observable as ObservableType
-from pydantic import BaseModel, ValidationError
-from .msg_types import LockCommand
+from pydantic import ValidationError
+
+from iotxs.lock.record_types import LockReqRecord, DATABASE_NAME, LOCK_REQ_RECORD_COLLECTION_NAME
+from iotxs.msg_types import LockCommand
 from logging import Logger
 from typing import Optional
 from datetime import datetime
@@ -16,17 +18,8 @@ from datetime import datetime
 SUBSCRIPTION_NAME_PATTERN = "iotxs/+/lock"
 CLIENT_NAME_PATTERN = re.compile(".*?/(.*?)/")
 life_state = False
-DATABASE_NAME = "iotxs"
-LOCK_REQ_RECORD_COLLECTION_NAME = "lock_req_records"
 
 logger: Optional[Logger] = None
-
-
-class LockReqRecord(BaseModel):
-    client: str
-    command: LockCommand
-    datetime: datetime
-
 
 lock_req_record_list: list[LockReqRecord] = []
 
