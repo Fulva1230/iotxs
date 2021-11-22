@@ -12,3 +12,10 @@ class LockReqRecord(BaseModel):
     client: str
     command: LockCommand
     datetime: datetime
+
+
+class LockStateRecord(BaseModel):
+    owner: str
+    pending_clients: list[str]
+    datetime: datetime
+    expire_time: datetime

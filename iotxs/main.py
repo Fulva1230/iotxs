@@ -7,6 +7,7 @@ from . import msg_types
 from .lock import mqtt_listener
 from datetime import datetime
 import asyncio
+from .lock import coordinator
 
 app = FastAPI()
 app_daemons: list[asyncio.Task] = []
@@ -30,10 +31,14 @@ async def startup_event():
     mqtt_listener.logger = logging.getLogger("uvicorn.lock")
     mqtt_listener.logger.setLevel(logging.DEBUG)
     mqtt_listener.init()
+    coordinator.logger = logging.getLogger("uvicorn.coordinator")
+    coordinator.logger.setLevel(logging.DEBUG)
+    coordinator.init()
 
 
 @app.on_event("shutdown")
 async def startup_event():
+    coordinator.deinit()
     mqtt_listener.deinit()
     connectivity.deinit()
     connectivity.thread.join()

@@ -79,6 +79,7 @@ def test_change_stream():
                 async for change in change_stream:
                     i += 1
                     if i == 5:
+                        print(change)
                         await change_stream.close()
         except BaseException as e:
             print(e)
