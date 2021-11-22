@@ -13,5 +13,5 @@ class LockCommand(BaseModel):
 
 
 class LockNotification(BaseModel):
-    state: Literal["PENDING", "TOOK", "HOLD", "RELEASED", "STOP PENDING"]
+    state: Literal["PENDING", "TOOK", "HOLD", "RELEASED", "STOP PENDING", "NOOP"]
     expire_time: Optional[datetime] = None
