@@ -5,8 +5,9 @@ from iotxs import connectivity
 from rx.core.typing import Observable as ObservableType
 from pydantic import ValidationError
 
-from iotxs.lock.record_types import LockReqRecord, DATABASE_NAME, LOCK_REQ_RECORD_COLLECTION_NAME
-from iotxs.msg_types import LockCommand
+from iotxs.lock.record_types import LockReqRecord, DATABASE_NAME, LOCK_REQ_RECORD_COLLECTION_NAME, \
+    LOCK_NOTIFICATION_RECORD_COLLECTION_NAME, LockNotificationRecord
+from iotxs.msg_types import LockCommand, LockNotification
 from logging import Logger
 from typing import Optional
 from datetime import datetime
@@ -18,6 +19,7 @@ from datetime import datetime
 SUBSCRIPTION_NAME_PATTERN = "iotxs/+/lock"
 CLIENT_NAME_PATTERN = re.compile(".*?/(.*?)/")
 life_state = False
+PUBLISH_NAME_PATTERN = "iotxs/{client}/lock_notification"
 
 logger: Optional[Logger] = None
 
@@ -52,11 +54,30 @@ async def _mqtt_client_subscribe():
     connectivity.mqtt_client.message_callback_add(SUBSCRIPTION_NAME_PATTERN, _lock_msg_callback)
 
 
+async def _lock_notification_publish(lock_notification_record: LockNotificationRecord):
+    connectivity.mqtt_client.publish(PUBLISH_NAME_PATTERN.format(client=lock_notification_record.client),
+                                     lock_notification_record.lock_notification.json(exclude_none=True))
+
+
+async def _lock_notification_publish_task():
+    try:
+        async with connectivity.mongo_client[DATABASE_NAME][
+            LOCK_NOTIFICATION_RECORD_COLLECTION_NAME].watch() as change_stream:
+            while life_state:
+                next = await change_stream.try_next()
+                if next is not None:
+                    await _lock_notification_publish(LockNotificationRecord.parse_obj(next['fullDocument']))
+
+    except ValidationError as e:
+        logger.exception(e) if logger is not None else ...
+
+
 def init():
     global life_state
     life_state = True
     connectivity.coroutine_reqs.append(_lock_req_record_db_push())
     connectivity.coroutine_reqs.append(_mqtt_client_subscribe())
+    connectivity.coroutine_reqs.append(_lock_notification_publish_task())
 
 
 def deinit():
@@ -64,7 +85,3 @@ def deinit():
     life_state = False
     connectivity.mqtt_client.unsubscribe(SUBSCRIPTION_NAME_PATTERN, 2)
     connectivity.mqtt_client.message_callback_remove(SUBSCRIPTION_NAME_PATTERN)
-
-
-def owner_change() -> ObservableType[str]:
-    ...

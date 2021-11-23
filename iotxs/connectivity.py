@@ -23,10 +23,10 @@ def own_thread_func():
         mongo_client = AsyncIOMotorClient(DB_CONNECTION_STRING)
         mqtt_client.connect(SERVER_HOST, 1883, 60)
         while life_state in ["ENABLED", "STOP_REQ"]:
-            await push_requsted_tasks()
-            await loop_mqtt_client()
+            await _push_requsted_tasks()
+            await _loop_mqtt_client()
             await asyncio.sleep(0)
-        clean_up()
+        _clean_up()
 
     asyncio.run(async_main())
 
@@ -40,20 +40,20 @@ life_state: Literal["ENABLED", "DISABLED", "STOP_REQ"] = "DISABLED"
 coroutine_reqs: list[Coroutine] = []
 
 
-async def loop_mqtt_client():
+async def _loop_mqtt_client():
     mqtt_client.loop_read()
     mqtt_client.loop_write()
     mqtt_client.loop_misc()
 
 
-async def push_requsted_tasks():
+async def _push_requsted_tasks():
     global unfinished_task
     unfinished_task = [task for task in unfinished_task if task.done() is not True]
     unfinished_task.extend([asyncio.create_task(coroutine) for coroutine in coroutine_reqs])
     coroutine_reqs.clear()
 
 
-def clean_up():
+def _clean_up():
     if mongo_client is not None:
         mongo_client.close()
     mqtt_client.disconnect()
