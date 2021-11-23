@@ -68,6 +68,38 @@ def test_basic_working():
     assert saved_msgs[0].state == "TOOK"
     assert saved_msgs[1].state == "RELEASED"
 
+def test_basic_pending_working():
+    connectivity.init()
+    saved_msgs: list[LockNotification] = []
+
+    def notification_callback(client, userdata, msg):
+        try:
+            saved_msgs.append(LockNotification.parse_raw(msg.payload))
+        except BaseException as e:
+            print(e)
+
+    async def setup_notification_callback():
+        connectivity.mqtt_client.subscribe("iotxs/+/lock_notification")
+        connectivity.mqtt_client.message_callback_add("iotxs/+/lock_notification", notification_callback)
+
+    connectivity.coroutine_reqs.append(setup_notification_callback())
+
+    async def publish_req():
+        connectivity.mqtt_client.publish("iotxs/John/lock", LockCommand(intent="LOCK").json())
+        await asyncio.sleep(1.0)
+        connectivity.mqtt_client.publish("iotxs/Alice/lock", LockCommand(intent="LOCK").json())
+        await asyncio.sleep(1.0)
+
+    connectivity.coroutine_reqs.append(publish_req())
+    time.sleep(5.0)
+    connectivity.deinit()
+    connectivity.thread.join()
+    assert len(saved_msgs) == 4
+    assert saved_msgs[0].state == "TOOK"
+    assert saved_msgs[1].state == "PENDING"
+    assert saved_msgs[2].state == "RELEASED"
+    assert saved_msgs[3].state == "TOOK"
+    assert saved_msgs[4].state == "RELEASED"
 
 def test_get_current_state_with_nothing():
     connectivity.init()

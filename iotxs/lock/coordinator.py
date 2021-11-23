@@ -15,6 +15,25 @@ logger: Optional[Logger] = None
 deinit_listeners: list[Coroutine] = []
 
 
+class Transition:
+    req_record: Optional[LockReqRecord]
+    lock_state: LockStateRecord
+
+    def __init__(self, lock_state: LockStateRecord, req_record: Optional[LockReqRecord]):
+        self.lock_state = lock_state
+        self.req_record = req_record
+        self.current_time = datetime.now()
+
+    def take(self):
+        ...
+
+    def next_lock_state(self) -> LockStateRecord:
+        ...
+
+    def lock_notifications(self) -> list[LockNotificationRecord]:
+        ...
+
+
 async def get_current_state():
     res = await connectivity.mongo_client[DATABASE_NAME][LOCK_STATE_RECORD_COLLECTION_NAME] \
         .find_one(sort=[("datetime", pymongo.DESCENDING)])
@@ -120,14 +139,18 @@ async def new_req_callback(req_record: LockReqRecord):
         else:
             if req_record.client not in current_state.pending_clients:
                 new_lock_state = current_state.copy()
+                new_lock_state.datetime = current_time
                 new_lock_state.pending_clients.append(req_record.client)
                 if current_state.expire_time >= current_time:
+                    await push_lock_state(new_lock_state)
                     await push_notification_record(LockNotificationRecord(
                         client=req_record.client,
                         lock_notification=LockNotification(state="PENDING"),
                         datetime=current_time
                     ))
-                await lock_state_update(new_lock_state)
+                else:
+                    await lock_state_update(new_lock_state)
+
             else:
                 await push_notification_record(LockNotificationRecord(
                     client=req_record.client,
