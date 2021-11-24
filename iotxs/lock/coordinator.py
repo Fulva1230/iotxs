@@ -30,6 +30,7 @@ class Transition:
         self.next_updates = []
 
     def _expire_move(self):
+        self.next_lock_state.datetime = self.current_time
         if len(self.lock_state.pending_clients) > 0:
             self.next_lock_state.owner = self.next_lock_state.pending_clients.pop(0)
             self.next_lock_state.expire_time = self.current_time + timedelta(seconds=2.0)
@@ -38,6 +39,7 @@ class Transition:
                 lock_notification=LockNotification(state="TOOK"),
                 datetime=self.current_time
             ))
+            self.next_updates.append(self.current_time + timedelta(seconds=2.0))
         else:
             self.next_lock_state.owner = "noone"
             self.next_lock_state.expire_time = self.current_time
@@ -48,15 +50,19 @@ class Transition:
         ))
 
     def _expand(self):
+        self.next_lock_state.datetime = self.current_time
         self.next_lock_state.expire_time = self.current_time + timedelta(seconds=2.0)
         self.lock_notifications.append(LockNotificationRecord(
             client=self.next_lock_state.owner,
             lock_notification=LockNotification(state="RELEASED"),
             datetime=self.current_time
         ))
+        self.next_updates.append(self.current_time + timedelta(seconds=2.0))
 
     def _direct_take_lock(self):
+        self.next_lock_state.datetime = self.current_time
         self.next_lock_state.owner = self.req_record.client
+        self.next_lock_state.expire_time = self.current_time + timedelta(seconds=2.0)
         self.lock_notifications.append(LockNotificationRecord(
             client=self.next_lock_state.owner,
             lock_notification=LockNotification(state="TOOK"),
@@ -67,16 +73,10 @@ class Transition:
             lock_notification=LockNotification(state="RELEASED"),
             datetime=self.current_time
         ))
+        self.next_updates.append(self.current_time + timedelta(seconds=2.0))
 
     def _pending(self):
-        self.next_lock_state.pending_clients.append(self.req_record.client)
-        self.lock_notifications.append(LockNotificationRecord(
-            client=self.next_lock_state.owner,
-            lock_notification=LockNotification(state="PENDING"),
-            datetime=self.current_time
-        ))
-
-    def _stop_pending(self):
+        self.next_lock_state.datetime = self.current_time
         self.next_lock_state.pending_clients.append(self.req_record.client)
         self.lock_notifications.append(LockNotificationRecord(
             client=self.next_lock_state.owner,
@@ -85,36 +85,55 @@ class Transition:
         ))
 
     def _lock_req_move(self):
-        if self.lock_state.owner == self.req_record.client and self.lock_state.expire_time >= self.current_time:
+        if self.lock_state.owner == self.req_record.client and self.lock_state.expire_time > self.current_time:
             self._expand()
         else:
-            if len(self.lock_state.pending_clients) == 0 and self.lock_state.expire_time < self.current_time:
+            if len(self.lock_state.pending_clients) == 0 and self.lock_state.expire_time <= self.current_time:
                 self._direct_take_lock()
             elif self.req_record.client not in self.lock_state.pending_clients:
                 self._pending()
 
+    def _stop_pending(self):
+        self.next_lock_state.datetime = self.current_time
+        self.next_lock_state.pending_clients.remove(self.req_record.client)
+        self.lock_notifications.append(LockNotificationRecord(
+            client=self.req_record.client,
+            lock_notification=LockNotification(state="STOPPED PENDING"),
+            datetime=self.current_time
+        ))
+
+    def _no_op(self):
+        self.lock_notifications.append(LockNotificationRecord(
+            client=self.req_record.client,
+            lock_notification=LockNotification(state="NOOP"),
+            datetime=self.current_time
+        ))
+
+    def _unlock_req_move(self):
+        if self.req_record.client == self.lock_state.owner:
+            self._expire_move()
+        elif self.req_record.client in self.lock_state.pending_clients:
+            self._stop_pending()
+        else:
+            self._no_op()
+
     def take(self):
         self.current_time = datetime.now()
         self.next_lock_state = self.lock_state.copy()
-        self.next_lock_state.datetime = self.current_time
         if self.req_record is None:
-            if self.lock_state.expire_time < self.current_time:
+            if self.lock_state.expire_time <= self.current_time:
                 self._expire_move()
         else:
             if self.req_record.command.intent == "LOCK":
                 self._lock_req_move()
             elif self.req_record.command.intent == "UNLOCK":
-                if self.req_record.client == self.lock_state.owner:
-                    self._expire_move()
-                elif self.req_record.client in self.lock_state.pending_clients:
-                    self._stop_pending()
-
+                self._unlock_req_move()
 
     def next_lock_state(self) -> LockStateRecord:
         return self.next_lock_state
 
     def has_lock_state_changed(self) -> bool:
-        ...
+        return self.next_lock_state != self.lock_state
 
     def lock_notifications(self) -> list[LockNotificationRecord]:
         return self.lock_notifications
@@ -136,6 +155,11 @@ async def push_notification_record(record: LockNotificationRecord):
     await connectivity.mongo_client[DATABASE_NAME][LOCK_NOTIFICATION_RECORD_COLLECTION_NAME].insert_one(
         record.dict()
     )
+
+
+async def initialize_lock_state():
+    await push_lock_state(
+        LockStateRecord(owner="noone", pending_clients=[], datetime=datetime.now(), expire_time=datetime.now()))
 
 
 async def expand_expire_time(lock_state: LockStateRecord, expanded_time: datetime):
