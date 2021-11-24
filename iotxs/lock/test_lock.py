@@ -12,7 +12,7 @@ import pymongo
 
 
 def test_re_pattern():
-    assert re.search(mqtt_listener.CLIENT_NAME_PATTERN, "jiowe/wjiofew/jfoiwejf/wioefj").group(1) == "wjiofew"
+    assert re.search(mqtt_facer.CLIENT_NAME_PATTERN, "jiowe/wjiofew/jfoiwejf/wioefj").group(1) == "wjiofew"
 
 
 def test_datetime():
@@ -79,8 +79,10 @@ def test_basic_pending_working():
             print(e)
 
     async def setup_notification_callback():
-        connectivity.mqtt_client.subscribe("iotxs/+/lock_notification")
-        connectivity.mqtt_client.message_callback_add("iotxs/+/lock_notification", notification_callback)
+        connectivity.mqtt_client.subscribe("iotxs/John/lock_notification")
+        connectivity.mqtt_client.message_callback_add("iotxs/John/lock_notification", notification_callback)
+        connectivity.mqtt_client.subscribe("iotxs/Alice/lock_notification")
+        connectivity.mqtt_client.message_callback_add("iotxs/Alice/lock_notification", notification_callback)
 
     connectivity.coroutine_reqs.append(setup_notification_callback())
 
@@ -94,7 +96,7 @@ def test_basic_pending_working():
     time.sleep(5.0)
     connectivity.deinit()
     connectivity.thread.join()
-    assert len(saved_msgs) == 4
+    assert len(saved_msgs) == 5
     assert saved_msgs[0].state == "TOOK"
     assert saved_msgs[1].state == "PENDING"
     assert saved_msgs[2].state == "RELEASED"

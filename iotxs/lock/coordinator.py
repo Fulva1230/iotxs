@@ -31,6 +31,11 @@ class Transition:
         self.next_updates = []
 
     def _expire_move(self):
+        self.lock_notifications.append(LockNotificationRecord(
+            client=self.lock_state.owner,
+            lock_notification=LockNotification(state="RELEASED"),
+            datetime=self.current_time
+        ))
         self.next_lock_state.datetime = self.current_time
         if len(self.lock_state.pending_clients) > 0:
             self.next_lock_state.owner = self.next_lock_state.pending_clients.pop(0)
@@ -44,11 +49,6 @@ class Transition:
         else:
             self.next_lock_state.owner = "noone"
             self.next_lock_state.expire_time = self.current_time
-        self.lock_notifications.append(LockNotificationRecord(
-            client=self.lock_state.owner,
-            lock_notification=LockNotification(state="RELEASED"),
-            datetime=self.current_time
-        ))
 
     def _expand(self):
         self.next_lock_state.datetime = self.current_time
@@ -80,7 +80,7 @@ class Transition:
         self.next_lock_state.datetime = self.current_time
         self.next_lock_state.pending_clients.append(self.req_record.client)
         self.lock_notifications.append(LockNotificationRecord(
-            client=self.next_lock_state.owner,
+            client=self.req_record.client,
             lock_notification=LockNotification(state="PENDING"),
             datetime=self.current_time
         ))
