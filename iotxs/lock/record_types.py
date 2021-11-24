@@ -17,8 +17,7 @@ class LockReqRecord(BaseModel):
 
 
 class LockStateRecord(BaseModel):
-    owner: str
-    pending_clients: list[str]
+    owner_list: list[str]
     datetime: datetime
     expire_time: datetime
 

@@ -27,12 +27,14 @@ lock_req_record_list: list[LockReqRecord] = []
 
 
 async def _lock_req_record_db_push():
+    global lock_req_record_list
     while life_state:
         if len(lock_req_record_list) != 0:
             try:
-                await connectivity.mongo_client[DATABASE_NAME][LOCK_REQ_RECORD_COLLECTION_NAME].insert_many(
-                    (req_record.dict() for req_record in lock_req_record_list))
-                lock_req_record_list.clear()
+                while len(lock_req_record_list) > 0:
+                    res = await connectivity.mongo_client[DATABASE_NAME][LOCK_REQ_RECORD_COLLECTION_NAME].insert_many(
+                        [req_record.dict() for req_record in lock_req_record_list])
+                    del lock_req_record_list[:len(res.inserted_ids)]
             except BaseException as e:
                 logger.exception(e) if logger is not None else ...
         await asyncio.sleep(0)
