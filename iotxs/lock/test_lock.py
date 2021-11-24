@@ -233,6 +233,7 @@ def test_basic_unlock():
     assert client.received_msgs[0].state == "TOOK"
     assert client.received_msgs[1].state == "RELEASED"
 
+
 def test_soft_pressure_test():
     connectivity.init()
     client = client_emulator.Client("Alice")
@@ -273,3 +274,7 @@ def test_pressure_test():
     for i in range(1, 50):
         assert client.received_msgs[i].state == "HOLD"
     assert client.received_msgs[50].state == "RELEASED"
+
+
+def test_time_delta():
+    assert ((datetime(2021, 12, 30, 11, 11, 12) - datetime(2021, 12, 30, 11, 11, 15)).total_seconds()) == -3.0

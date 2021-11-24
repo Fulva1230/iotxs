@@ -173,9 +173,14 @@ async def transition(req_record: Optional[LockReqRecord], current_state: LockSta
 
 async def schedule_transition(moment: datetime):
     async def impl():
-        await asyncio.sleep((moment - datetime.now()).total_seconds())
+        current_time = datetime.now()
+        wait_time = (moment - current_time).total_seconds()
+        while wait_time > 0:
+            await asyncio.sleep(wait_time)
+            current_time = datetime.now()
+            wait_time = (moment - current_time).total_seconds()
         current_state = await get_current_state()
-        await transition(None, current_state, moment) if current_state is not None else None
+        await transition(None, current_state, current_time) if current_state is not None else None
 
     connectivity.coroutine_reqs.append(impl())
 
