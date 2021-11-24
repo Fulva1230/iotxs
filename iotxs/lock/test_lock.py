@@ -9,6 +9,7 @@ from .record_types import LockReqRecord, LockStateRecord
 from ..msg_types import LockNotification, LockCommand
 import time
 import pymongo
+from . import client_emulator
 
 
 def test_re_pattern():
@@ -214,3 +215,40 @@ def test_get_latest_state():
 
     assert latest_non_expire[0] == LockStateRecord(owner_list=["John"], datetime=datetime(2020, 11, 3),
                                                    expire_time=datetime(2020, 12, 3))
+
+
+def test_basic_unlock():
+    connectivity.init()
+    client = client_emulator.Client("Alice")
+
+    async def task():
+        client.lock()
+        await asyncio.sleep(0.2)
+        client.unlock()
+
+    connectivity.coroutine_reqs.append(task())
+    time.sleep(1.5)
+    connectivity.deinit()
+    connectivity.thread.join()
+    assert client.received_msgs[0].state == "TOOK"
+    assert client.received_msgs[1].state == "RELEASED"
+
+
+def test_pressure_test():
+    connectivity.init()
+    client = client_emulator.Client("Alice")
+
+    async def task():
+        for i in range(50):
+            client.lock()
+            await asyncio.sleep(0.02)
+        client.unlock()
+
+    connectivity.coroutine_reqs.append(task())
+    time.sleep(1.5)
+    connectivity.deinit()
+    connectivity.thread.join()
+    assert client.received_msgs[0].state == "TOOK"
+    for i in range(1, 50):
+        assert client.received_msgs[i].state == "HOLD"
+    assert client.received_msgs[50].state == "RELEASED"
