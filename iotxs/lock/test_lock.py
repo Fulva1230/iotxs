@@ -201,6 +201,70 @@ def test_basic_unlock():
     assert client.received_msgs[1].state == "RELEASED"
 
 
+def test_basic_stop_pending():
+    connectivity.init()
+    alice = client_emulator.Client("Alice")
+    eren = client_emulator.Client("Eren")
+
+    async def task():
+        alice.lock()
+        await asyncio.sleep(0.05)
+        eren.lock()
+        await asyncio.sleep(0.05)
+        eren.unlock()
+        await asyncio.sleep(0.05)
+        alice.unlock()
+        await asyncio.sleep(0.05)
+        eren.unlock()
+
+    connectivity.coroutine_reqs.append(task())
+    time.sleep(1.5)
+    connectivity.deinit()
+    connectivity.thread.join()
+    assert alice.received_msgs[0].state == "TOOK"
+    assert alice.received_msgs[1].state == "RELEASED"
+    assert eren.received_msgs[0].state == "PENDING"
+    assert eren.received_msgs[1].state == "STOPPED PENDING"
+    assert eren.received_msgs[2].state == "NOOP"
+
+
+def test_general_case1():
+    connectivity.init()
+    alice = client_emulator.Client("Alice")
+    eren = client_emulator.Client("Eren")
+
+    async def task():
+        alice.lock()
+        await asyncio.sleep(0.05)
+        eren.lock()
+        await asyncio.sleep(0.05)
+        alice.lock()
+        await asyncio.sleep(0.05)
+        alice.lock()
+        await asyncio.sleep(0.05)
+        eren.lock()
+        await asyncio.sleep(0.05)
+        alice.unlock()
+        await asyncio.sleep(0.05)
+        eren.lock()
+        await asyncio.sleep(0.05)
+        eren.unlock()
+
+    connectivity.coroutine_reqs.append(task())
+    time.sleep(1.5)
+    connectivity.deinit()
+    connectivity.thread.join()
+    assert alice.received_msgs[0].state == "TOOK"
+    assert alice.received_msgs[1].state == "HOLD"
+    assert alice.received_msgs[2].state == "HOLD"
+    assert alice.received_msgs[3].state == "RELEASED"
+    assert eren.received_msgs[0].state == "PENDING"
+    assert eren.received_msgs[1].state == "NOOP"
+    assert eren.received_msgs[2].state == "TOOK"
+    assert eren.received_msgs[3].state == "HOLD"
+    assert eren.received_msgs[4].state == "RELEASED"
+
+
 def test_soft_pressure_test():
     connectivity.init()
     client = client_emulator.Client("Alice")
