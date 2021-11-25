@@ -17,6 +17,7 @@ from datetime import datetime
 #
 
 SUBSCRIPTION_NAME_PATTERN = "iotxs/+/lock"
+SUBSCRIPTION_QoS = 0
 CLIENT_NAME_PATTERN = re.compile(".*?/(.*?)/")
 life_state = False
 PUBLISH_NAME_PATTERN = "iotxs/{client}/lock_notification"
@@ -52,7 +53,7 @@ def _lock_msg_callback(client, userdata, msg):
 
 
 async def _mqtt_client_subscribe():
-    connectivity.mqtt_client.subscribe(SUBSCRIPTION_NAME_PATTERN, 2)
+    connectivity.mqtt_client.subscribe(SUBSCRIPTION_NAME_PATTERN, SUBSCRIPTION_QoS)
     connectivity.mqtt_client.message_callback_add(SUBSCRIPTION_NAME_PATTERN, _lock_msg_callback)
 
 

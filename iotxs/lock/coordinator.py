@@ -186,8 +186,8 @@ async def schedule_transition(moment: datetime):
 
 
 async def new_req_callback(req_record: LockReqRecord):
-    logger.debug("got the callback")
-    logger.debug(req_record)
+    logger.debug("got the callback") if logger is not None else ...
+    logger.debug(req_record) if logger is not None else ...
     current_state = await get_current_state()
     moment = datetime.now()
     if current_state is None:
@@ -205,7 +205,7 @@ async def setup_new_req_callback():
                     await new_req_callback(LockReqRecord.parse_obj(next['fullDocument']))
 
     except ValidationError as e:
-        logger.exception(e)
+        logger.exception(e) if logger is not None else ...
 
 
 def init():
