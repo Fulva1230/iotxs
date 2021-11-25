@@ -1,5 +1,3 @@
-import threading
-
 from iotxs.lock import mqtt_facer
 from iotxs import connectivity
 import re
@@ -152,37 +150,6 @@ def test_pending_with_holding_working():
     assert alice_msgs[0].state == "PENDING"
     assert alice_msgs[1].state == "TOOK"
     assert alice_msgs[2].state == "RELEASED"
-
-
-def test_get_current_state_with_nothing():
-    connectivity.init()
-    latest_non_expire: list[LockStateRecord] = []
-
-    async def task():
-        try:
-            await connectivity.mongo_client["iotxs"]["test_lock_records"].drop()
-            await connectivity.mongo_client["iotxs"]["test_lock_records"].insert_many(
-                [
-                    LockStateRecord(owner="John", pending_clients=[], datetime=datetime(2020, 11, 1),
-                                    expire_time=datetime(2020, 12, 1)).dict(),
-                    LockStateRecord(owner="John", pending_clients=[], datetime=datetime(2020, 11, 2),
-                                    expire_time=datetime(2020, 12, 2)).dict(),
-                    LockStateRecord(owner="John", pending_clients=[], datetime=datetime(2020, 11, 3),
-                                    expire_time=datetime(2020, 12, 3)).dict()
-                ]
-            )
-            res = await connectivity.mongo_client["iotxs"]["test_lock_records"] \
-                .find_one({"expire_time": {"$gt": datetime(2020, 12, 3)}}, sort=[("datetime", pymongo.DESCENDING)])
-            latest_non_expire.append(LockStateRecord.parse_obj(res))
-        except BaseException as e:
-            print(e)
-        finally:
-            connectivity.deinit()
-
-    connectivity.coroutine_reqs.append(task())
-    connectivity.thread.join()
-
-    assert len(latest_non_expire) == 0
 
 
 def test_get_latest_state():
