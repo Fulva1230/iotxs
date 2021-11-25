@@ -222,6 +222,28 @@ def test_soft_pressure_test():
     assert client.received_msgs[20].state == "RELEASED"
 
 
+def test_soft_pressure_for_long_test():
+    connectivity.init()
+    client = client_emulator.Client("Alice")
+    secs = 60
+
+    async def task():
+        for i in range(20 * secs):
+            client.lock()
+            await asyncio.sleep(0.05)
+        client.unlock()
+
+    connectivity.coroutine_reqs.append(task())
+    time.sleep(secs + 10)
+    connectivity.deinit()
+    connectivity.thread.join()
+    assert len(client.received_msgs) == 20 * secs + 1
+    assert client.received_msgs[0].state == "TOOK"
+    for i in range(1, 20 * secs):
+        assert client.received_msgs[i].state == "HOLD"
+    assert client.received_msgs[20 * secs].state == "RELEASED"
+
+
 def test_pressure_test():
     connectivity.init()
     client = client_emulator.Client("Alice")
