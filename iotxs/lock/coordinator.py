@@ -6,13 +6,32 @@ from .record_types import LockReqRecord, DATABASE_NAME, LOCK_STATE_RECORD_COLLEC
     LOCK_REQ_RECORD_COLLECTION_NAME, LockStateRecord, LockNotificationRecord, LOCK_NOTIFICATION_RECORD_COLLECTION_NAME
 from pydantic import ValidationError
 from logging import Logger
-from typing import Optional, Callable, Awaitable, Coroutine
+from typing import Optional, Callable, Awaitable, Coroutine, Protocol, ClassVar
 import pymongo
 from iotxs.msg_types import LockNotification
 
 life_state = False
 logger: Optional[Logger] = None
 deinit_listeners: list[Coroutine] = []
+
+
+class StateAgent(Protocol):
+    async def push_lock_state(self, lock_state_record: LockStateRecord):
+        ...
+
+    async def get_current_state(self) -> Optional[LockStateRecord]:
+        ...
+
+    async def push_lock_notification(self, lock_notification_record: LockNotificationRecord):
+        ...
+
+
+class EventAgent(Protocol):
+    def listen_on_lock_req(self, callback: Callable[[LockReqRecord], None]):
+        ...
+
+    def stop_listen_on_lock_req(self):
+        ...
 
 
 class Transition:
@@ -136,6 +155,62 @@ class Transition:
 
     def get_lock_notifications(self) -> list[LockNotificationRecord]:
         return self.lock_notifications
+
+
+class Coordinator:
+    state_agent: Callable[[], StateAgent]
+    event_agent: Callable[[], EventAgent]
+    _state_agent: StateAgent
+    _event_agent: EventAgent
+    _lock_reqs: list[LockReqRecord]
+    _enabled: bool
+
+    def __init__(self):
+        self._state_agent = self.state_agent()
+        self._event_agent = self.event_agent()
+        self._lock_reqs = []
+        self._enabled = True
+
+    async def transition(self, transition_inst: Transition):
+        transition_inst.take()
+        if transition_inst.has_lock_state_changed():
+            await self._state_agent.push_lock_state(transition_inst.get_next_lock_state())
+        [await self._state_agent.push_lock_notification(notification) for notification in
+         transition_inst.get_lock_notifications()]
+        [await self.schedule_transition(moment) for moment in transition_inst.next_updates]
+
+    async def schedule_transition(self, moment: datetime):
+        async def impl():
+            current_time = datetime.now()
+            wait_time = (moment - current_time).total_seconds()
+            while wait_time > 0:
+                await asyncio.sleep(wait_time)
+                current_time = datetime.now()
+                wait_time = (moment - current_time).total_seconds()
+            current_state = await self._state_agent.get_current_state()
+            await self.transition(Transition(current_state, None, current_time))
+
+        asyncio.create_task(impl())
+
+    async def process_lock_reqs(self):
+        while self._enabled:
+            for lock_req in self._lock_reqs:
+                current_time = datetime.now()
+                current_state = await self._state_agent.get_current_state()
+                await self.transition(Transition(current_state, lock_req, current_time))
+            self._lock_reqs.clear()
+            await asyncio.sleep(0)
+
+    def lock_req_callback(self, lock_req: LockReqRecord):
+        self._lock_reqs.append(lock_req)
+
+    def start(self):
+        self._event_agent.listen_on_lock_req(self.lock_req_callback)
+        asyncio.create_task(self.schedule_transition(datetime.now()))
+        asyncio.create_task(self.process_lock_reqs())
+
+    def shutdown(self):
+        self._enabled = False
 
 
 async def get_current_state() -> Optional[LockStateRecord]:
