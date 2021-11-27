@@ -1,10 +1,6 @@
-import logging
-import tkinter.tix
-
 from .coordinator import StateAgent, EventAgent, Coordinator
 from .record_types import LockNotificationRecord, LockStateRecord, LockReqRecord
 from typing import Optional, Union, Literal, Coroutine, Callable
-from threading import Thread, current_thread
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 from .record_types import DATABASE_NAME, LOCK_STATE_RECORD_COLLECTION_NAME, LOCK_NOTIFICATION_RECORD_COLLECTION_NAME, \
@@ -14,7 +10,8 @@ from pydantic import ValidationError
 from collections import deque
 from dependency_injector import containers, providers
 from datetime import datetime
-import sys
+from loguru import logger
+from anyio import create_task_group
 
 SERVER_HOST = "10.144.69.132"
 DB_CONNECTION_STRING = "mongodb://aprilab:bossboss@{server}".format(server=SERVER_HOST)
@@ -70,22 +67,13 @@ class EventAgentImpl(EventAgent):
                 await asyncio.sleep(0)
 
 
-def init_mongo_client() -> AsyncIOMotorClient:
+async def init_mongo_client() -> AsyncIOMotorClient:
     mongo_client = AsyncIOMotorClient(DB_CONNECTION_STRING)
     yield mongo_client
     mongo_client.close()
 
 
-def logger() -> logging.Logger:
-    logger = logging.getLogger("lock.coordinator")
-    logger.setLevel(logging.DEBUG)
-    handler = logging.StreamHandler(sys.stdout)
-    logger.addHandler(handler)
-    return logger
-
-
 class Container(containers.DeclarativeContainer):
-    logger = providers.Singleton(logger)
     mongo_client = providers.Resource(init_mongo_client)
     event_agent = providers.Factory(EventAgentImpl, mongo_client)
     state_agent = providers.Factory(StateAgentImpl, mongo_client)
@@ -93,20 +81,22 @@ class Container(containers.DeclarativeContainer):
 
 
 def main():
-    container = Container()
-    logger_inst = container.logger()
-
     async def impl():
-        container.init_resources()
-        coordinator = container.lock_coordinator()
-        logger_inst.info("started")
-        await coordinator.task()
+        container = Container()
+        await container.init_resources()
+        coordinator = await container.lock_coordinator()
+        try:
+            logger.info("started")
+            async with create_task_group() as tg:
+                tg.start_soon(coordinator.task)
+        finally:
+            logger.info("cleaning up")
+            await container.shutdown_resources()
 
     try:
         asyncio.run(impl())
     except KeyboardInterrupt as e:
-        logger_inst.info("cleaning up~")
-    container.shutdown_resources()
+        logger.info("cleaned up")
 
 
 if __name__ == "__main__":
