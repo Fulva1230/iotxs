@@ -12,6 +12,7 @@ from loguru import logger
 
 from anyio import create_task_group
 
+from iotxs.io.io import init_mongo_client, init_mqtt_client
 from iotxs.lock.record_types import LockReqRecord, DATABASE_NAME, LOCK_REQ_RECORD_COLLECTION_NAME, \
     LockNotificationRecord, LOCK_NOTIFICATION_RECORD_COLLECTION_NAME
 from iotxs.msg_types import LockCommand
@@ -125,28 +126,6 @@ class MqttConnector:
         except ValidationError as e:
             ...
 
-
-def init_mongo_client() -> AsyncIOMotorClient:
-    mongo_client = AsyncIOMotorClient(DB_CONNECTION_STRING)
-    yield mongo_client
-    mongo_client.close()
-
-
-async def init_mqtt_client() -> MqttClient:
-    mqtt_client = MqttClient()
-    mqtt_client.connect(SERVER_HOST, 1883, 60)
-
-    async def refresh():
-        while True:
-            mqtt_client.loop_read()
-            mqtt_client.loop_write()
-            mqtt_client.loop_misc()
-            await asyncio.sleep(0)
-
-    refresh_task = asyncio.create_task(refresh())
-    yield mqtt_client
-    refresh_task.cancel()
-    mqtt_client.disconnect()
 
 
 class Container(containers.DeclarativeContainer):

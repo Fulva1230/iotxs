@@ -8,7 +8,6 @@ from .record_types import LockReqRecord, DATABASE_NAME, LOCK_STATE_RECORD_COLLEC
 from pydantic import ValidationError
 from logging import Logger
 from typing import Optional, Callable, Awaitable, Coroutine, Protocol, ClassVar
-import pymongo
 from iotxs.msg_types import LockNotification
 from anyio import sleep, create_task_group
 
@@ -206,89 +205,3 @@ class Coordinator:
             tg.start_soon(self.process_lock_reqs)
             tg.start_soon(self.process_self_update)
             tg.start_soon(self._event_agent.listen_lock_req_task)
-
-
-async def get_current_state() -> Optional[LockStateRecord]:
-    res = await connectivity.mongo_client[DATABASE_NAME][LOCK_STATE_RECORD_COLLECTION_NAME] \
-        .find_one(sort=[("datetime", pymongo.DESCENDING)])
-    return LockStateRecord.parse_obj(res) if res is not None else None
-
-
-async def push_lock_state(lock_state: LockStateRecord):
-    await connectivity.mongo_client[DATABASE_NAME][LOCK_STATE_RECORD_COLLECTION_NAME].insert_one(
-        lock_state.dict()
-    )
-
-
-async def push_notification_record(record: LockNotificationRecord):
-    await connectivity.mongo_client[DATABASE_NAME][LOCK_NOTIFICATION_RECORD_COLLECTION_NAME].insert_one(
-        record.dict()
-    )
-
-
-async def initialize_lock_state():
-    await push_lock_state(
-        LockStateRecord(owner_list=[], datetime=datetime.now() - timedelta(seconds=3.0),
-                        expire_time=datetime.now() - timedelta(seconds=3.0)))
-
-
-async def transition(req_record: Optional[LockReqRecord], current_state: LockStateRecord, moment: datetime):
-    transition_inst = Transition(current_state, req_record, moment)
-    transition_inst.take()
-    if transition_inst.has_lock_state_changed():
-        await push_lock_state(transition_inst.get_next_lock_state())
-    [await push_notification_record(notification) for notification in transition_inst.get_lock_notifications()]
-    [await schedule_transition(moment) for moment in transition_inst.next_updates]
-
-
-async def schedule_transition(moment: datetime):
-    async def impl():
-        current_time = datetime.now()
-        wait_time = (moment - current_time).total_seconds()
-        while wait_time > 0:
-            await asyncio.sleep(wait_time)
-            current_time = datetime.now()
-            wait_time = (moment - current_time).total_seconds()
-        current_state = await get_current_state()
-        await transition(None, current_state, current_time) if current_state is not None else None
-
-    connectivity.coroutine_reqs.append(impl())
-
-
-async def new_req_callback(req_record: LockReqRecord):
-    logger.debug("got the callback") if logger is not None else ...
-    logger.debug(req_record) if logger is not None else ...
-    current_state = await get_current_state()
-    moment = datetime.now()
-    if current_state is None:
-        await initialize_lock_state()
-        current_state = await get_current_state()
-    await transition(req_record, current_state, moment)
-
-
-async def setup_new_req_callback():
-    try:
-        async with connectivity.mongo_client[DATABASE_NAME][LOCK_REQ_RECORD_COLLECTION_NAME].watch() as change_stream:
-            while life_state:
-                next = await change_stream.try_next()
-                if next is not None:
-                    await new_req_callback(LockReqRecord.parse_obj(next['fullDocument']))
-
-    except ValidationError as e:
-        logger.exception(e) if logger is not None else ...
-
-
-def init():
-    global life_state
-    life_state = True
-    connectivity.coroutine_reqs.append(setup_new_req_callback())
-
-
-async def deinit_deinit_listeners():
-    [await deinit_listener for deinit_listener in deinit_listeners]
-
-
-def deinit():
-    global life_state
-    life_state = False
-    connectivity.coroutine_reqs.append(deinit_deinit_listeners())

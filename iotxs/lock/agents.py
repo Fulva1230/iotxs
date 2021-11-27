@@ -8,13 +8,8 @@ from .record_types import DATABASE_NAME, LOCK_STATE_RECORD_COLLECTION_NAME, LOCK
 import pymongo
 from pydantic import ValidationError
 from collections import deque
-from dependency_injector import containers, providers
 from datetime import datetime
-from loguru import logger
-from anyio import create_task_group
 
-SERVER_HOST = "10.144.69.132"
-DB_CONNECTION_STRING = "mongodb://aprilab:bossboss@{server}".format(server=SERVER_HOST)
 
 
 class StateAgentImpl:
@@ -65,39 +60,3 @@ class EventAgentImpl(EventAgent):
                 return self._pending_processed.popleft()
             except IndexError:
                 await asyncio.sleep(0)
-
-
-async def init_mongo_client() -> AsyncIOMotorClient:
-    mongo_client = AsyncIOMotorClient(DB_CONNECTION_STRING)
-    yield mongo_client
-    mongo_client.close()
-
-
-class Container(containers.DeclarativeContainer):
-    mongo_client = providers.Resource(init_mongo_client)
-    event_agent = providers.Factory(EventAgentImpl, mongo_client)
-    state_agent = providers.Factory(StateAgentImpl, mongo_client)
-    lock_coordinator = providers.Factory(Coordinator, state_agent=state_agent, event_agent=event_agent)
-
-
-def main():
-    async def impl():
-        container = Container()
-        await container.init_resources()
-        coordinator = await container.lock_coordinator()
-        try:
-            logger.info("started")
-            async with create_task_group() as tg:
-                tg.start_soon(coordinator.task)
-        finally:
-            logger.info("cleaning up")
-            await container.shutdown_resources()
-
-    try:
-        asyncio.run(impl())
-    except KeyboardInterrupt as e:
-        logger.info("cleaned up")
-
-
-if __name__ == "__main__":
-    main()
