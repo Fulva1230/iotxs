@@ -1,4 +1,5 @@
 import asyncio
+import heapq
 from datetime import datetime, timedelta
 
 from iotxs import connectivity
@@ -9,6 +10,7 @@ from logging import Logger
 from typing import Optional, Callable, Awaitable, Coroutine, Protocol, ClassVar
 import pymongo
 from iotxs.msg_types import LockNotification
+from anyio import sleep, create_task_group
 
 life_state = False
 logger: Optional[Logger] = None
@@ -27,10 +29,10 @@ class StateAgent(Protocol):
 
 
 class EventAgent(Protocol):
-    def listen_on_lock_req(self, callback: Callable[[LockReqRecord], None]):
+    async def next_lock_req(self) -> LockReqRecord:
         ...
 
-    def stop_listen_on_lock_req(self):
+    async def listen_lock_req_task(self):
         ...
 
 
@@ -158,18 +160,15 @@ class Transition:
 
 
 class Coordinator:
-    state_agent: Callable[[], StateAgent]
-    event_agent: Callable[[], EventAgent]
     _state_agent: StateAgent
     _event_agent: EventAgent
-    _lock_reqs: list[LockReqRecord]
-    _enabled: bool
+    _update_moments: list[datetime]
 
-    def __init__(self):
-        self._state_agent = self.state_agent()
-        self._event_agent = self.event_agent()
-        self._lock_reqs = []
-        self._enabled = True
+    def __init__(self, state_agent: StateAgent,
+                 event_agent: EventAgent):
+        self._state_agent = state_agent
+        self._event_agent = event_agent
+        self._update_moments = []
 
     async def transition(self, transition_inst: Transition):
         transition_inst.take()
@@ -177,40 +176,36 @@ class Coordinator:
             await self._state_agent.push_lock_state(transition_inst.get_next_lock_state())
         [await self._state_agent.push_lock_notification(notification) for notification in
          transition_inst.get_lock_notifications()]
-        [await self.schedule_transition(moment) for moment in transition_inst.next_updates]
+        for moment in transition_inst.next_updates:
+            heapq.heappush(self._update_moments, moment)
 
-    async def schedule_transition(self, moment: datetime):
-        async def impl():
-            current_time = datetime.now()
-            wait_time = (moment - current_time).total_seconds()
-            while wait_time > 0:
-                await asyncio.sleep(wait_time)
+    async def process_self_update(self):
+        while True:
+            try:
+                moment = heapq.heappop(self._update_moments)
                 current_time = datetime.now()
                 wait_time = (moment - current_time).total_seconds()
-            current_state = await self._state_agent.get_current_state()
-            await self.transition(Transition(current_state, None, current_time))
-
-        asyncio.create_task(impl())
+                while wait_time > 0:
+                    await asyncio.sleep(wait_time)
+                    current_time = datetime.now()
+                    wait_time = (moment - current_time).total_seconds()
+                current_state = await self._state_agent.get_current_state()
+                await self.transition(Transition(current_state, None, current_time))
+            except IndexError:
+                await asyncio.sleep(0)
 
     async def process_lock_reqs(self):
-        while self._enabled:
-            for lock_req in self._lock_reqs:
-                current_time = datetime.now()
-                current_state = await self._state_agent.get_current_state()
-                await self.transition(Transition(current_state, lock_req, current_time))
-            self._lock_reqs.clear()
-            await asyncio.sleep(0)
+        while True:
+            lock_req = await self._event_agent.next_lock_req()
+            lock_state = await self._state_agent.get_current_state()
+            moment = datetime.now()
+            await self.transition(Transition(lock_state, lock_req, moment))
 
-    def lock_req_callback(self, lock_req: LockReqRecord):
-        self._lock_reqs.append(lock_req)
-
-    def start(self):
-        self._event_agent.listen_on_lock_req(self.lock_req_callback)
-        asyncio.create_task(self.schedule_transition(datetime.now()))
-        asyncio.create_task(self.process_lock_reqs())
-
-    def shutdown(self):
-        self._enabled = False
+    async def task(self):
+        async with create_task_group() as tg:
+            tg.start_soon(self.process_lock_reqs)
+            tg.start_soon(self.process_self_update)
+            tg.start_soon(self._event_agent.listen_lock_req_task)
 
 
 async def get_current_state() -> Optional[LockStateRecord]:

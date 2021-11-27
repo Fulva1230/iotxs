@@ -8,95 +8,80 @@ from .record_types import DATABASE_NAME, LOCK_STATE_RECORD_COLLECTION_NAME, LOCK
     LOCK_REQ_RECORD_COLLECTION_NAME
 import pymongo
 from pydantic import ValidationError
-
-mongo_client: AsyncIOMotorClient
-thread: Thread
-_enabled: False
+from collections import deque
+from dependency_injector import containers, providers
 
 SERVER_HOST = "10.144.69.132"
 DB_CONNECTION_STRING = "mongodb://aprilab:bossboss@{server}".format(server=SERVER_HOST)
 
 
 class StateAgentImpl:
+    def __init__(self, _mongo_client: AsyncIOMotorClient):
+        self._mongo_client = _mongo_client
+
     async def push_lock_state(self, lock_state_record: LockStateRecord):
-        await mongo_client[DATABASE_NAME][LOCK_STATE_RECORD_COLLECTION_NAME].insert_one(
+        await self._mongo_client[DATABASE_NAME][LOCK_STATE_RECORD_COLLECTION_NAME].insert_one(
             lock_state_record.dict()
         )
 
     async def get_current_state(self) -> Optional[LockStateRecord]:
-        res = await mongo_client[DATABASE_NAME][LOCK_STATE_RECORD_COLLECTION_NAME] \
+        res = await self._mongo_client[DATABASE_NAME][LOCK_STATE_RECORD_COLLECTION_NAME] \
             .find_one(sort=[("datetime", pymongo.DESCENDING)])
         return LockStateRecord.parse_obj(res) if res is not None else None
 
     async def push_lock_notification(self, lock_notification_record: LockNotificationRecord):
-        await mongo_client[DATABASE_NAME][LOCK_NOTIFICATION_RECORD_COLLECTION_NAME].insert_one(
+        await self._mongo_client[DATABASE_NAME][LOCK_NOTIFICATION_RECORD_COLLECTION_NAME].insert_one(
             lock_notification_record.dict()
         )
 
 
-class EventAgentImpl:
-    listeners: list[Callable[[LockReqRecord], None]]
-    event_task: asyncio.Task
+class EventAgentImpl(EventAgent):
+    _mongo_client: AsyncIOMotorClient
+    _pending_processed: deque[LockReqRecord]
 
-    def __init__(self):
-        self.listeners = []
+    def __init__(self, _mongo_client: AsyncIOMotorClient):
+        self._mongo_client = _mongo_client
+        self._pending_processed = deque()
 
-    def call_listeners(self, lock_req_record: LockReqRecord):
-        [listener(lock_req_record) for listener in self.listeners]
-
-    async def first_listener_init(self):
+    async def listen_lock_req_task(self):
         try:
-            async with mongo_client[DATABASE_NAME][
+            async with self._mongo_client[DATABASE_NAME][
                 LOCK_REQ_RECORD_COLLECTION_NAME].watch() as change_stream:
                 while True:
                     next = await change_stream.try_next()
                     if next is not None:
-                        self.call_listeners(LockReqRecord.parse_obj(next['fullDocument']))
+                        self._pending_processed.append(LockReqRecord.parse_obj(next['fullDocument']))
+
         except ValidationError as e:
             ...
 
-    def listen_on_lock_req(self, callback: Callable[[LockReqRecord], None]):
-        if len(self.listeners) == 0:
-            self.event_task = asyncio.create_task(self.first_listener_init())
-        self.listeners.append(callback)
-
-    def stop_listen_on_lock_req(self):
-        self.event_task.cancel()
-        self.listeners.clear()
+    async def next_lock_req(self) -> LockReqRecord:
+        while True:
+            try:
+                return self._pending_processed.popleft()
+            except IndexError:
+                await asyncio.sleep(0)
 
 
-class WiredCoordinator(Coordinator):
-    state_agent = StateAgentImpl
-    event_agent = EventAgentImpl
-
-
-def _clean_up():
+def init_mongo_client() -> AsyncIOMotorClient:
+    mongo_client = AsyncIOMotorClient(DB_CONNECTION_STRING)
+    yield mongo_client
     mongo_client.close()
 
 
-def own_thread_func():
-    async def async_main():
-        global mongo_client
-        mongo_client = AsyncIOMotorClient(DB_CONNECTION_STRING)
-        while _enabled:
-            await asyncio.sleep(0)
-        _clean_up()
-
-    asyncio.run(async_main())
+class Container(containers.DeclarativeContainer):
+    mongo_client = providers.Resource(init_mongo_client)
+    event_agent = providers.Factory(EventAgentImpl, mongo_client)
+    state_agent = providers.Factory(StateAgentImpl, mongo_client)
+    lock_coordinator = providers.Factory(Coordinator, state_agent=state_agent, event_agent=event_agent)
 
 
-def init():
-    global _enabled
-    _enabled = True
-    thread = Thread(target=own_thread_func)
-    thread.start()
-
-
-def deinit():
-    global _enabled
-    _enabled = False
-
-
-def wait_for_deinit_finished():
-    if thread is not current_thread():
-        thread.join()
+if __name__ == "__main__":
+    container = Container()
+    container.init_resources()
+    coordinator = container.lock_coordinator()
+    try:
+        asyncio.run(coordinator.task())
+    except KeyboardInterrupt:
+        ...
+    container.shutdown_resources()
