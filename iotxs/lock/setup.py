@@ -1,3 +1,6 @@
+import logging
+import tkinter.tix
+
 from .coordinator import StateAgent, EventAgent, Coordinator
 from .record_types import LockNotificationRecord, LockStateRecord, LockReqRecord
 from typing import Optional, Union, Literal, Coroutine, Callable
@@ -10,6 +13,8 @@ import pymongo
 from pydantic import ValidationError
 from collections import deque
 from dependency_injector import containers, providers
+from datetime import datetime
+import sys
 
 SERVER_HOST = "10.144.69.132"
 DB_CONNECTION_STRING = "mongodb://aprilab:bossboss@{server}".format(server=SERVER_HOST)
@@ -27,7 +32,9 @@ class StateAgentImpl:
     async def get_current_state(self) -> Optional[LockStateRecord]:
         res = await self._mongo_client[DATABASE_NAME][LOCK_STATE_RECORD_COLLECTION_NAME] \
             .find_one(sort=[("datetime", pymongo.DESCENDING)])
-        return LockStateRecord.parse_obj(res) if res is not None else None
+        return LockStateRecord.parse_obj(res) if res is not None else LockStateRecord(owner_list=[],
+                                                                                      datetime=datetime.now(),
+                                                                                      expire_time=datetime.now())
 
     async def push_lock_notification(self, lock_notification_record: LockNotificationRecord):
         await self._mongo_client[DATABASE_NAME][LOCK_NOTIFICATION_RECORD_COLLECTION_NAME].insert_one(
@@ -69,7 +76,16 @@ def init_mongo_client() -> AsyncIOMotorClient:
     mongo_client.close()
 
 
+def logger() -> logging.Logger:
+    logger = logging.getLogger("lock.coordinator")
+    logger.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(sys.stdout)
+    logger.addHandler(handler)
+    return logger
+
+
 class Container(containers.DeclarativeContainer):
+    logger = providers.Singleton(logger)
     mongo_client = providers.Resource(init_mongo_client)
     event_agent = providers.Factory(EventAgentImpl, mongo_client)
     state_agent = providers.Factory(StateAgentImpl, mongo_client)
@@ -78,10 +94,18 @@ class Container(containers.DeclarativeContainer):
 
 if __name__ == "__main__":
     container = Container()
-    container.init_resources()
-    coordinator = container.lock_coordinator()
+    logger_inst = container.logger()
+
+
+    async def impl():
+        container.init_resources()
+        coordinator = container.lock_coordinator()
+        logger_inst.info("started")
+        await coordinator.task()
+
+
     try:
-        asyncio.run(coordinator.task())
-    except KeyboardInterrupt:
-        ...
+        asyncio.run(impl())
+    except KeyboardInterrupt as e:
+        logger_inst.info("cleaning up~")
     container.shutdown_resources()

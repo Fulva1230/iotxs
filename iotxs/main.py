@@ -31,14 +31,14 @@ async def startup_event():
     mqtt_facer.logger = logging.getLogger("uvicorn.lock")
     mqtt_facer.logger.setLevel(logging.DEBUG)
     mqtt_facer.init()
-    coordinator.logger = logging.getLogger("uvicorn.coordinator")
-    coordinator.logger.setLevel(logging.DEBUG)
-    coordinator.init()
+    # coordinator.logger = logging.getLogger("uvicorn.coordinator")
+    # coordinator.logger.setLevel(logging.DEBUG)
+    # coordinator.init()
 
 
 @app.on_event("shutdown")
 async def startup_event():
-    coordinator.deinit()
+    # coordinator.deinit()
     mqtt_facer.deinit()
     connectivity.deinit()
     connectivity.thread.join()
