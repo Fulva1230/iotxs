@@ -6,3 +6,4 @@ PyYAML
 motor
 rx
 dependency-injector>=4.0,<5.0
+loguru
