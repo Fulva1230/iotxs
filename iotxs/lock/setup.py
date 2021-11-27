@@ -92,10 +92,9 @@ class Container(containers.DeclarativeContainer):
     lock_coordinator = providers.Factory(Coordinator, state_agent=state_agent, event_agent=event_agent)
 
 
-if __name__ == "__main__":
+def main():
     container = Container()
     logger_inst = container.logger()
-
 
     async def impl():
         container.init_resources()
@@ -103,9 +102,12 @@ if __name__ == "__main__":
         logger_inst.info("started")
         await coordinator.task()
 
-
     try:
         asyncio.run(impl())
     except KeyboardInterrupt as e:
         logger_inst.info("cleaning up~")
     container.shutdown_resources()
+
+
+if __name__ == "__main__":
+    main()
