@@ -95,7 +95,7 @@ class MqttConnector:
                         LOCK_REQ_RECORD_COLLECTION_NAME].insert_many(
                         [req_record.dict() for req_record in self.lock_req_record_list])
                     del self.lock_req_record_list[:len(res.inserted_ids)]
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.01)
 
     def _lock_msg_callback(self, client, userdata, msg):
         try:

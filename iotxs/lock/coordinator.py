@@ -191,7 +191,7 @@ class Coordinator:
                 current_state = await self._state_agent.get_current_state()
                 await self.transition(Transition(current_state, None, current_time))
             except IndexError:
-                await asyncio.sleep(0)
+                await asyncio.sleep(0.01)
 
     async def process_lock_reqs(self):
         while True:

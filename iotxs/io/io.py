@@ -21,7 +21,7 @@ async def init_mqtt_client() -> MqttClient:
             mqtt_client.loop_read()
             mqtt_client.loop_write()
             mqtt_client.loop_misc()
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.1)
 
     refresh_task = asyncio.create_task(refresh())
     yield mqtt_client

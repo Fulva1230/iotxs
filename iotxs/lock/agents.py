@@ -59,4 +59,4 @@ class EventAgentImpl(EventAgent):
             try:
                 return self._pending_processed.popleft()
             except IndexError:
-                await asyncio.sleep(0)
+                await asyncio.sleep(0.01)
