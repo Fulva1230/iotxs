@@ -74,12 +74,13 @@ class MqttToDbBridge:
 class MqttConnector:
     mqtt_client: MqttClient
     mongo_client: AsyncIOMotorClient
-    lock_req_record_list: list[LockReqRecord] = []
+    lock_req_record_list: list[LockReqRecord]
 
     def __init__(self, mongo_client: AsyncIOMotorClient,
                  mqtt_client: MqttClient):
         self.mqtt_client = mqtt_client
         self.mongo_client = mongo_client
+        self.lock_req_record_list = []
 
     async def task(self):
         async with create_task_group() as tg:
