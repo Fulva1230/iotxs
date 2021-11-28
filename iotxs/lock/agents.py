@@ -28,7 +28,9 @@ class StateAgentImpl:
                                                                                           datetime=datetime.now(),
                                                                                           expire_time=datetime.now())
         except ValidationError:
-            ...
+            return LockStateRecord(owner_list=[],
+                                   datetime=datetime.now(),
+                                   expire_time=datetime.now())
 
     async def push_lock_notification(self, lock_notification_record: LockNotificationRecord):
         await self._mongo_client[DATABASE_NAME][LOCK_NOTIFICATION_RECORD_COLLECTION_NAME].insert_one(
