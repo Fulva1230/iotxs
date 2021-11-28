@@ -1,8 +1,10 @@
 import re
+import signal
 from asyncio import CancelledError
 from datetime import datetime
 from typing import ClassVar, NamedTuple, Type, Literal
 
+import anyio
 from dependency_injector import containers, providers
 from pydantic import BaseModel, ValidationError
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -127,6 +129,13 @@ class MqttConnector:
             ...
 
 
+async def init_terminate_callback(cancel_scope: anyio.CancelScope):
+    def handler(signum, frame):
+        logger.info("Received Ctrl+C")
+        cancel_scope.cancel()
+
+    signal.signal(signal.SIGINT, handler)
+
 
 class Container(containers.DeclarativeContainer):
     mongo_client = providers.Resource(init_mongo_client)
@@ -138,20 +147,18 @@ async def main_impl():
     container = Container()
     await container.init_resources()
     try:
-        logger.debug("started!")
+        logger.info("started!")
         mqtt_connector = await container.mqtt_connector()
         async with create_task_group() as tg:
             tg.start_soon(mqtt_connector.task)
+            await init_terminate_callback(tg.cancel_scope)
     finally:
         await container.shutdown_resources()
-        print("cleaned up")
+        logger.info("cleaned up")
 
 
 def main():
-    try:
-        asyncio.run(main_impl())
-    except KeyboardInterrupt:
-        ...
+    asyncio.run(main_impl())
 
 
 if __name__ == "__main__":
