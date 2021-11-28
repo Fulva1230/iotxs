@@ -11,7 +11,6 @@ from collections import deque
 from datetime import datetime
 
 
-
 class StateAgentImpl:
     def __init__(self, _mongo_client: AsyncIOMotorClient):
         self._mongo_client = _mongo_client
@@ -22,11 +21,14 @@ class StateAgentImpl:
         )
 
     async def get_current_state(self) -> Optional[LockStateRecord]:
-        res = await self._mongo_client[DATABASE_NAME][LOCK_STATE_RECORD_COLLECTION_NAME] \
-            .find_one(sort=[("datetime", pymongo.DESCENDING)])
-        return LockStateRecord.parse_obj(res) if res is not None else LockStateRecord(owner_list=[],
-                                                                                      datetime=datetime.now(),
-                                                                                      expire_time=datetime.now())
+        try:
+            res = await self._mongo_client[DATABASE_NAME][LOCK_STATE_RECORD_COLLECTION_NAME] \
+                .find_one(sort=[("datetime", pymongo.DESCENDING)])
+            return LockStateRecord.parse_obj(res) if res is not None else LockStateRecord(owner_list=[],
+                                                                                          datetime=datetime.now(),
+                                                                                          expire_time=datetime.now())
+        except ValidationError:
+            ...
 
     async def push_lock_notification(self, lock_notification_record: LockNotificationRecord):
         await self._mongo_client[DATABASE_NAME][LOCK_NOTIFICATION_RECORD_COLLECTION_NAME].insert_one(
