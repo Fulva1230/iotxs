@@ -20,7 +20,7 @@ class StateAgent(Protocol):
     async def push_lock_state(self, lock_state_record: LockStateRecord):
         ...
 
-    async def get_current_state(self) -> Optional[LockStateRecord]:
+    async def get_current_state(self) -> LockStateRecord:
         ...
 
     async def push_lock_notification(self, lock_notification_record: LockNotificationRecord):

@@ -20,7 +20,7 @@ class StateAgentImpl:
             lock_state_record.dict()
         )
 
-    async def get_current_state(self) -> Optional[LockStateRecord]:
+    async def get_current_state(self) -> LockStateRecord:
         try:
             res = await self._mongo_client[DATABASE_NAME][LOCK_STATE_RECORD_COLLECTION_NAME] \
                 .find_one(sort=[("datetime", pymongo.DESCENDING)])
