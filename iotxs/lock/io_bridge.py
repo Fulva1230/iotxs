@@ -22,7 +22,7 @@ from iotxs.msg_types import LockCommand
 SUBSCRIPTION_NAME_PATTERN = "iotxs/+/lock"
 SUBSCRIPTION_QoS = 0
 CLIENT_NAME_PATTERN = re.compile(".*?/(.*?)/")
-PUBLISH_NAME_PATTERN = "iotxs/{client}/lock_notification"
+PUBLISH_NAME_PATTERN = "iotxs/{client}/lock/notification"
 SERVER_HOST = "10.144.69.132"
 DB_CONNECTION_STRING = "mongodb://aprilab:bossboss@{server}".format(server=SERVER_HOST)
 
