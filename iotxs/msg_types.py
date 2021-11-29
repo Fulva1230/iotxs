@@ -15,3 +15,13 @@ class LockCommand(BaseModel):
 class LockNotification(BaseModel):
     state: Literal["STARTED PENDING", "STOPPED PENDING", "PENDING", "TOOK", "HOLD", "RELEASED", "NOOP"]
     expire_time: Optional[datetime] = None
+
+
+class DeviceRequest(BaseModel):
+    intent: Literal["GET", "PUT"]
+    data: str
+
+
+class DeviceResponse(BaseModel):
+    state: Literal["FAILED", "SUCCESSFUL"]
+    data: str
