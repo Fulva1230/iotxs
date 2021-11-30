@@ -3,8 +3,8 @@ from .record_types import LockNotificationRecord, LockStateRecord, LockReqRecord
 from typing import Optional, Union, Literal, Coroutine, Callable
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
-from .record_types import DATABASE_NAME, LOCK_STATE_RECORD_COLLECTION_NAME, LOCK_NOTIFICATION_RECORD_COLLECTION_NAME, \
-    LOCK_REQ_RECORD_COLLECTION_NAME
+from ..config import DATABASE_NAME, LOCK_REQ_RECORD_COLLECTION_NAME, LOCK_STATE_RECORD_COLLECTION_NAME, \
+    LOCK_NOTIFICATION_RECORD_COLLECTION_NAME
 import pymongo
 from pydantic import ValidationError
 from collections import deque

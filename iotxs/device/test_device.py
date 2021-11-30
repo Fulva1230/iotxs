@@ -4,7 +4,7 @@ from datetime import datetime
 
 from iotxs.io.io import init_mongo_client
 from iotxs.device.agents import PersistenceAgentImpl
-from iotxs.device.data_types import DeviceRequestRecord, DeviceResponseRecord
+from iotxs.device.data_types import DeviceRequestRecord, DeviceResponseRecord, SerialDeviceRequest
 from iotxs.msg_types import DeviceRequest, DeviceResponse
 
 from dependency_injector import containers, providers
@@ -32,5 +32,18 @@ def test_persistence_agent():
         res_record_from_database = await persistence_agent.get_device_response(res_record.id)
         assert res_record == res_record_from_database
         await container.shutdown_resources()
+
+    asyncio.run(impl())
+
+
+def test_tcp_server_emulator():
+    async def impl():
+        (reader, writer) = await asyncio.open_connection("localhost", 9995)
+        req = SerialDeviceRequest(id=uuid.uuid4(), has_lock=True, device="motor1", request=DeviceRequest(intent="GET", data=""))
+        writer.write((req.json() + '\n').encode())
+        await writer.drain()
+        readbytes = await reader.readline()
+        print(readbytes)
+        writer.close()
 
     asyncio.run(impl())

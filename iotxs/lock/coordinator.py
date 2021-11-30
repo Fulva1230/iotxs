@@ -3,8 +3,9 @@ import heapq
 from datetime import datetime, timedelta
 
 from iotxs import connectivity
-from .record_types import LockReqRecord, DATABASE_NAME, LOCK_STATE_RECORD_COLLECTION_NAME, \
-    LOCK_REQ_RECORD_COLLECTION_NAME, LockStateRecord, LockNotificationRecord, LOCK_NOTIFICATION_RECORD_COLLECTION_NAME
+from .record_types import LockReqRecord, LockStateRecord, LockNotificationRecord
+from ..config import DATABASE_NAME, LOCK_REQ_RECORD_COLLECTION_NAME, LOCK_STATE_RECORD_COLLECTION_NAME, \
+    LOCK_NOTIFICATION_RECORD_COLLECTION_NAME
 from pydantic import ValidationError
 from logging import Logger
 from typing import Optional, Callable, Awaitable, Coroutine, Protocol, ClassVar

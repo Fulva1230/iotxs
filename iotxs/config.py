@@ -1,0 +1,7 @@
+DATABASE_NAME = "iotxs"
+LOCK_REQ_RECORD_COLLECTION_NAME = "lock_req_records"
+LOCK_STATE_RECORD_COLLECTION_NAME = "lock_records"
+LOCK_NOTIFICATION_RECORD_COLLECTION_NAME = "lock_notification_records"
+
+DEVICE_HOST = "localhost"
+DEVICE_PORT = "9995"

@@ -14,6 +14,8 @@ from iotxs.lock.record_types import LockStateRecord
 from iotxs.msg_types import DeviceRequest
 from datetime import datetime
 
+from loguru import logger
+
 SUBSCRIBE_TOPIC = "iotxs/+/device/+"
 PUBLISH_TOPIC = "iotxs/{client}/device/{device}/res"
 
@@ -48,25 +50,33 @@ class Server:
     received_reqs: deque[DeviceRequestRecord] = attr.ib(default=attr.Factory(deque))
 
     async def request_to_serial(self, req: SerialDeviceRequest):
-        self.serial_agent.writer.write(req.json().encode())
+        logger.debug("write to serial {}".format(req.json()))
+        self.serial_agent.writer.write((req.json() + '\n').encode())
         await self.serial_agent.writer.drain()
 
     async def has_lock(self, client: str) -> bool:
         lock = await self.lock_agent.get_current_state()
-        return lock.owner_list[0] == client
+        if len(lock.owner_list) > 0:
+            return lock.owner_list[0] == client
+        else:
+            return False
 
     async def process_received_reqs(self):
         while True:
             try:
                 req = self.received_reqs.popleft()
                 await self.persistence_agent.save_device_request(req)
-                serial_req = SerialDeviceRequest(has_lock=await self.has_lock(req.client),
+                lock_state = await self.has_lock(req.client)
+                serial_req = SerialDeviceRequest(has_lock=lock_state,
                                                  device=req.device,
                                                  request=req.request,
                                                  id=req.id)
+
                 await self.request_to_serial(serial_req)
             except IndexError:
                 await asyncio.sleep(0.01)
+            except ValidationError as e:
+                logger.debug(e)
 
     async def next_res(self) -> SerialDeviceResponse:
         while True:
@@ -85,6 +95,7 @@ class Server:
             self.mqtt_client.publish(PUBLISH_TOPIC.format(client=req.client, device=req.device), res.response.json())
 
     async def task(self):
+        await self.subscribe_to_topics()
         try:
             async with create_task_group() as tg:
                 tg.start_soon(self.process_received_ress)
@@ -96,6 +107,7 @@ class Server:
     def msg_callback(self, client, userdata, msg):
         (_, client_str, _, device_str) = msg.topic.split('/')
         try:
+            logger.debug("got msg{}".format(msg.payload))
             self.received_reqs.append(
                 DeviceRequestRecord(client=client_str, device=device_str, datetime=datetime.now(),
                                     request=DeviceRequest.parse_raw(msg.payload), id=uuid.uuid4())
