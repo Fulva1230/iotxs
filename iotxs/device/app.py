@@ -7,12 +7,13 @@ from dependency_injector import containers, providers
 from iotxs.io.io import init_mongo_client, init_mqtt_client
 from . import agents
 from . import server
+from iotxs import config
 
 
 class Container(containers.DeclarativeContainer):
     mqtt_client = providers.Resource(init_mqtt_client)
     mongo_client = providers.Resource(init_mongo_client)
-    serial_agent = providers.Resource(agents.init_serial_agent, host="127.0.0.1", port=9995)
+    serial_agent = providers.Resource(agents.init_serial_agent, host=config.DEVICE_HOST, port=config.DEVICE_PORT)
     persistence_agent = providers.Factory(agents.PersistenceAgentImpl, mongo_client=mongo_client)
     lock_agent = providers.Factory(agents.LockAgentImpl, mongo_client=mongo_client)
     server = providers.Factory(server.Server, mqtt_client=mqtt_client, serial_agent=serial_agent,
