@@ -72,6 +72,7 @@ class PersistenceAgentImpl:
 
 async def init_serial_agent(host: str, port: int):
     (reader, writer) = await asyncio.open_connection(host, port)
-    yield SerialAgentImpl(reader=reader, writer=writer)
+    serial_agent = SerialAgentImpl(reader=reader, writer=writer)
+    yield serial_agent
     writer.close()
     await writer.wait_closed()

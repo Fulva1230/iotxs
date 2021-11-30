@@ -80,11 +80,14 @@ class Server:
 
     async def next_res(self) -> SerialDeviceResponse:
         while True:
-            res_bytes = await self.serial_agent.reader.readline()
-            try:
-                return SerialDeviceResponse.parse_raw(res_bytes)
-            except ValidationError:
-                ...
+            if not self.serial_agent.reader.at_eof():
+                res_bytes = await self.serial_agent.reader.readline()
+                try:
+                    return SerialDeviceResponse.parse_raw(res_bytes)
+                except ValidationError:
+                    ...
+            else:
+                await asyncio.sleep(0.1)
 
     async def process_received_ress(self):
         while True:
