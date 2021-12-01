@@ -4,7 +4,6 @@ from typing import Optional, Union
 from fastapi import FastAPI
 from . import connectivity
 from . import msg_types
-from .lock import mqtt_facer
 from datetime import datetime
 import asyncio
 
@@ -27,13 +26,9 @@ async def startup_event():
     connectivity.logger = logging.getLogger("uvicorn.connectivity")
     connectivity.logger.setLevel(logging.DEBUG)
     connectivity.init()
-    mqtt_facer.logger = logging.getLogger("uvicorn.lock")
-    mqtt_facer.logger.setLevel(logging.DEBUG)
-    mqtt_facer.init()
 
 
 @app.on_event("shutdown")
 async def startup_event():
-    mqtt_facer.deinit()
     connectivity.deinit()
     connectivity.thread.join()

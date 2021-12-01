@@ -1,4 +1,3 @@
-from iotxs.lock import mqtt_facer
 from iotxs import connectivity
 import re
 from datetime import datetime, timedelta
@@ -8,10 +7,6 @@ from ..msg_types import LockNotification, LockCommand
 import time
 import pymongo
 from . import client_emulator
-
-
-def test_re_pattern():
-    assert re.search(mqtt_facer.CLIENT_NAME_PATTERN, "jiowe/wjiofew/jfoiwejf/wioefj").group(1) == "wjiofew"
 
 
 def test_datetime():

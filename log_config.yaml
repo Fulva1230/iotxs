@@ -1,4 +1,0 @@
-version: 1
-loggers:
-  mqtt:
-    level: DEBUG
