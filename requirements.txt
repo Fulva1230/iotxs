@@ -1,5 +1,6 @@
 pytest
 fastapi
+pydantic
 uvicorn[standard]
 paho-mqtt
 PyYAML
@@ -8,3 +9,4 @@ rx
 dependency-injector>=4.0,<5.0
 loguru
 attrs
+anyio

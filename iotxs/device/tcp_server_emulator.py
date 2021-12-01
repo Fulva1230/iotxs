@@ -12,7 +12,7 @@ async def connection_callback(reader: asyncio.StreamReader, writer: asyncio.Stre
     while not writer.is_closing() and not reader.at_eof():
         req_bytes = await reader.readline()
         try:
-            req = data_types.SerialDeviceRequest.parse_raw(req_bytes[:-1])
+            req = data_types.SerialDeviceRequest.parse_raw(req_bytes)
             logger.debug("read {}".format(req))
             if req.request.intent == "PUT" and req.has_lock is False:
                 res = data_types.SerialDeviceResponse(id=req.id,
