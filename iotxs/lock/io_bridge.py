@@ -1,22 +1,19 @@
+import asyncio
 import re
 import signal
-from asyncio import CancelledError
 from datetime import datetime
-from typing import ClassVar, NamedTuple, Type, Literal
 
 import anyio
+from anyio import create_task_group
 from dependency_injector import containers, providers
-from pydantic import BaseModel, ValidationError
+from loguru import logger
 from motor.motor_asyncio import AsyncIOMotorClient
 from paho.mqtt.client import Client as MqttClient
-import asyncio
-from loguru import logger
+from pydantic import ValidationError
 
-from anyio import create_task_group
-
+from iotxs.config import DATABASE_NAME, LOCK_REQ_RECORD_COLLECTION_NAME, LOCK_NOTIFICATION_RECORD_COLLECTION_NAME
 from iotxs.io.io import init_mongo_client, init_mqtt_client
 from iotxs.lock.record_types import LockReqRecord, LockNotificationRecord
-from iotxs.config import DATABASE_NAME, LOCK_REQ_RECORD_COLLECTION_NAME, LOCK_NOTIFICATION_RECORD_COLLECTION_NAME
 from iotxs.msg_types import LockCommand
 
 SUBSCRIPTION_NAME_PATTERN = "iotxs/+/lock"
@@ -25,50 +22,6 @@ CLIENT_NAME_PATTERN = re.compile(".*?/(.*?)/")
 PUBLISH_NAME_PATTERN = "iotxs/{client}/lock/notification"
 SERVER_HOST = "10.144.69.132"
 DB_CONNECTION_STRING = "mongodb://aprilab:bossboss@{server}".format(server=SERVER_HOST)
-
-
-class DatabaseCollectionName(NamedTuple):
-    database_name: str
-    collection_name: str
-
-
-class MqttTopicConfig(NamedTuple):
-    topic: str
-    qos: Literal[0, 1, 2]
-
-
-class MqttToDbBridge:
-    database_collection_name: DatabaseCollectionName
-    model_t: Type[BaseModel]
-    mongo_client: AsyncIOMotorClient
-    mqtt_client: MqttClient
-    mqtt_topic_config: MqttTopicConfig
-    received_msgs: list[BaseModel]
-
-    def __init__(
-            self,
-            mqtt_topic_config: MqttTopicConfig,
-            database_collection_name: DatabaseCollectionName,
-            model_t: Type[BaseModel],
-            mongo_client: AsyncIOMotorClient,
-            mqtt_client: MqttClient
-    ):
-        self.mqtt_client = mqtt_client
-        self.mongo_client = mongo_client
-        self.model_t = model_t
-        self.database_collection_name = database_collection_name
-        self.mqtt_topic_config = mqtt_topic_config
-        self.received_msgs = []
-
-    def msg_callback(self, client, userdata, msg):
-        ...
-
-    def subscribe_to_topic(self):
-        self.mqtt_client.subscribe(self.mqtt_topic_config.topic, self.mqtt_topic_config.qos)
-        self.mqtt_client.message_callback_add(self.msg_callback)
-
-    async def task(self):
-        ...
 
 
 class MqttConnector:
