@@ -40,6 +40,7 @@ def test_tcp_server_emulator():
     async def impl():
         (reader, writer) = await asyncio.open_connection("localhost", 9995)
         req = SerialDeviceRequest(id=uuid.uuid4(), has_lock=True, device="motor1", request=DeviceRequest(intent="GET", data=""))
+        print("write {}".format(req.json()))
         writer.write((req.json() + '\n').encode())
         await writer.drain()
         readbytes = await reader.readline()

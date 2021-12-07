@@ -47,16 +47,15 @@ class EventAgentImpl(EventAgent):
         self._pending_processed = deque()
 
     async def listen_lock_req_task(self):
-        try:
-            async with self._mongo_client[DATABASE_NAME][
-                LOCK_REQ_RECORD_COLLECTION_NAME].watch() as change_stream:
-                while True:
-                    next = await change_stream.try_next()
-                    if next is not None:
+        async with self._mongo_client[DATABASE_NAME][
+            LOCK_REQ_RECORD_COLLECTION_NAME].watch() as change_stream:
+            while True:
+                next = await change_stream.try_next()
+                if next is not None:
+                    try:
                         self._pending_processed.append(LockReqRecord.parse_obj(next['fullDocument']))
-
-        except ValidationError as e:
-            ...
+                    except ValidationError as e:
+                        ...
 
     async def next_lock_req(self) -> LockReqRecord:
         while True:

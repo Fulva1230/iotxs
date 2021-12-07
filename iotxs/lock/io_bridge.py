@@ -71,16 +71,15 @@ class MqttConnector:
                                  lock_notification_record.lock_notification.json(exclude_none=True))
 
     async def _lock_notification_publish_task(self):
-        try:
-            async with self.mongo_client[DATABASE_NAME][
-                LOCK_NOTIFICATION_RECORD_COLLECTION_NAME].watch() as change_stream:
-                while True:
-                    next = await change_stream.try_next()
-                    if next is not None:
+        async with self.mongo_client[DATABASE_NAME][
+            LOCK_NOTIFICATION_RECORD_COLLECTION_NAME].watch() as change_stream:
+            while True:
+                next = await change_stream.try_next()
+                if next is not None:
+                    try:
                         await self._lock_notification_publish(LockNotificationRecord.parse_obj(next['fullDocument']))
-
-        except ValidationError as e:
-            ...
+                    except ValidationError as e:
+                        ...
 
 
 async def init_terminate_callback(cancel_scope: anyio.CancelScope):
