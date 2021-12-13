@@ -12,3 +12,26 @@ fulva@fulvahost:~/iotxs$ python -m iotxs.lock.io_bridge
 ```shell
 fulva@fulvahost:~/iotxs$ python -m iotxs.device.app
 ```
+
+# Usage
+For a client with its name "{ClientName}"
+
+Publish lock requests to topic
+```
+iotxs/{ClientName}/lock
+```
+Subscribe to
+```
+iotxs/{ClientName}/lock/notification
+```
+for responses and notifications
+
+Publish device requests for a device named "{DeviceName}" to topic
+```
+iotxs/{ClientName}/device/{DeviceName}
+```
+Subscribe to
+```
+iotxs/{ClientName}/device/{DeviceName}/res
+```
+for responses
