@@ -35,3 +35,35 @@ Subscribe to
 iotxs/{ClientName}/device/{DeviceName}/res
 ```
 for responses
+
+# Message Type
+Lock request
+```
+{
+  intent: Literal["LOCK", "UNLOCK"]
+}
+```
+
+Lock response
+```
+{
+   Literal["STARTED PENDING", "STOPPED PENDING", "PENDING", "TOOK", "HOLD", "RELEASED", "NOOP"]
+   expire_time: Optional[datetime]
+}
+```
+
+Device request
+```
+{
+  intent: Literal["GET", "PUT"]
+  data: str
+}
+```
+
+Device response
+```
+{
+  intent: Literal["FAILED", "SUCCESSFUL"]
+  data: str
+}
+```
