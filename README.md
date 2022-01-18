@@ -1,7 +1,7 @@
 # Setup
 Run the following commands in different terminals
 ```shell
-fulva@fulvahost:~/iotxs$ socat /dev/serial/by-id/... TCP-LISTEN:9995
+fulva@fulvahost:~/iotxs$ socat /dev/serial/by-id/... TCP-LISTEN:9995,fork,reuseaddr
 ```
 ```shell
 fulva@fulvahost:~/iotxs$ python -m iotxs.lock.operation_app
