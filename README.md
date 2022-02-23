@@ -47,7 +47,7 @@ Lock request
 Lock response
 ```
 {
-   Literal["STARTED PENDING", "STOPPED PENDING", "PENDING", "TOOK", "HOLD", "RELEASED", "NOOP"]
+   state: Literal["STARTED PENDING", "STOPPED PENDING", "PENDING", "TOOK", "HOLD", "RELEASED", "NOOP"]
    expire_time: Optional[datetime]
 }
 ```
@@ -63,7 +63,7 @@ Device request
 Device response
 ```
 {
-  intent: Literal["FAILED", "SUCCESSFUL"]
+  state: Literal["FAILED", "SUCCESSFUL"]
   data: str
 }
 ```
